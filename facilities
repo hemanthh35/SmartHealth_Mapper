@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nearby Healthcare Facilities</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
+    <style>
+        #map { height: 500px; width: 100%; }
+        #loading { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 font-roboto">
+
+    <nav class="bg-white shadow-md">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <a class="text-2xl font-bold text-green-600" href="#">SmartHealth</a>
+        </div>
+    </nav>
+
+    <h2 class="text-2xl font-bold text-center my-4">Find Nearby Healthcare Services</h2>
+
+    <div class="flex flex-col md:flex-row">
+        <div class="w-full md:w-1/3 bg-white p-4 shadow-md rounded-lg h-[500px] overflow-y-auto">
+            <h3 class="text-lg font-semibold">Select Healthcare Facility</h3>
+            <label for="hospital-type" class="block text-gray-700 mt-2">Choose Type:</label>
+            <select id="hospital-type" class="w-full p-2 border rounded mt-1">
+                <option value="hospital">General Hospital</option>
+                <option value="dentist">Dentist</option>
+                <option value="physiotherapist">Physiotherapist</option>
+                <option value="clinic">Clinic</option>
+                <option value="pharmacy">Pharmacy</option>
+                <option value="speciality_clinic">Super Specialty Clinic</option>
+            </select>
+            <button id="fetch-hospitals-btn" class="bg-green-600 text-white px-4 py-2 rounded-full font-semibold mt-4">Find Nearby</button>
+            <ul id="hospital-list" class="mt-2 text-sm text-gray-700"></ul>
+            <p id="loading" class="text-blue-500">Loading...</p>
+        </div>
+
+        <div id="map" class="rounded-lg shadow-md mx-auto md:w-2/3"></div>
+    </div>
+
+    <script>
+        const map = L.map('map').setView([20, 77], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        let userLat, userLng;
+
+        function fetchHospitals(lat, lng) {
+            document.getElementById("loading").style.display = "block";
+            const hospitalList = document.getElementById("hospital-list");
+            hospitalList.innerHTML = "";
+
+            const selectedType = document.getElementById("hospital-type").value;
+            const typeMapping = {
+                "hospital": "hospital",
+                "dentist": "dentist",
+                "physiotherapist": "physiotherapist",
+                "clinic": "clinic",
+                "pharmacy": "pharmacy",
+                "speciality_clinic": "clinic"
+            };
+            const overpassQuery = `
+                [out:json];
+                (
+                    node[amenity=${typeMapping[selectedType]}](around:10000, ${lat}, ${lng});
+                );
+                out body;
+                >;
+                out skel qt;
+            `;
+            const apiUrl = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(overpassQuery);
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("loading").style.display = "none";
+                    if (data.elements.length === 0) {
+                        hospitalList.innerHTML = "<p class='text-red-500'>No facilities found nearby.</p>";
+                    } else {
+                        data.elements.forEach(hospital => {
+                            const name = hospital.tags.name || "Unnamed Facility";
+                            const address = hospital.tags["addr:street"] || "No address available";
+                            const phone = hospital.tags["contact:phone"] || "No phone number available";
+                            const distance = getDistance(lat, lng, hospital.lat, hospital.lon).toFixed(2);
+                            const photoUrl = "https://placehold.co/100x100?text=Healthcare"; 
+
+                            L.marker([hospital.lat, hospital.lon])
+                                .addTo(map)
+                                .bindPopup(`<b>${name}</b><br>${address}<br>${phone}<br>Distance: ${distance} km`);
+
+                            const listItem = document.createElement("li");
+                            listItem.classList.add("mb-4", "flex", "items-center");
+                            listItem.innerHTML = `
+                                <img src="${photoUrl}" alt="Photo of ${name}" class="w-16 h-16 rounded mr-4">
+                                <div>
+                                    <b>${name}</b><br>${address}<br>${phone}<br>Distance: ${distance} km
+                                </div>
+                            `;
+                            hospitalList.appendChild(listItem);
+                        });
+                    }
+                })
+                .catch(error => {
+                    document.getElementById("loading").style.display = "none";
+                    console.error("Error fetching hospital data:", error);
+                    hospitalList.innerHTML = "<p class='text-red-500'>Failed to load data.</p>";
+                });
+        }
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                0.5 - Math.cos(dLat)/2 + 
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                (1 - Math.cos(dLon))/2;
+            return R * 2 * Math.asin(Math.sqrt(a));
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                userLat = position.coords.latitude;
+                userLng = position.coords.longitude;
+                map.setView([userLat, userLng], 14);
+                L.marker([userLat, userLng]).addTo(map).bindPopup("You are here").openPopup();
+                document.getElementById("fetch-hospitals-btn").addEventListener('click', () => fetchHospitals(userLat, userLng));
+            }, () => alert("Geolocation failed. Please enable location services."));
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
+    </script>
+</body>
+</html>
