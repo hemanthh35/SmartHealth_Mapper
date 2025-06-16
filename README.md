@@ -25,13 +25,6 @@ This project is a lightweight web application that allows users to find nearby h
 * 🖼 Placeholder images for each result
 
 ---
-
-## 🎥 Demo
-
-> Add a live demo link or screenshot here.
-
----
-
 ## 🛠 Technologies Used
 
 * **HTML5** + **CSS3** + **JavaScript (ES6)**
