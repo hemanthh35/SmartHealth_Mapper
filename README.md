@@ -39,7 +39,7 @@ This project is a lightweight web application that allows users to find nearby h
 1. Clone this repository:
 
 ```bash
-git clone https://github.com/your-username/nearby-healthcare-map.git
+git clone https://github.com/hemanthh35/SmartHealth_Mapper.git)
 cd nearby-healthcare-map
 ```
 
